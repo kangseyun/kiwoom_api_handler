@@ -3,7 +3,7 @@ from functools import wraps
 import os
 import sys
 
-sys.path.append(r"C:\Users\koko8\Documents\git-project\kiwoom_api")
+sys.path.append(r"C:\Users\seyun\Documents\project\kiwoom_api_handler")
 import unittest
 
 from PyQt5.QtWidgets import QApplication
@@ -28,7 +28,7 @@ class TestKiwoom(unittest.TestCase):
     def Setup(self):
         pass
 
-    # @initQt
+    @initQt
     def testSingleTone(self):
         app = QApplication(sys.argv)
 

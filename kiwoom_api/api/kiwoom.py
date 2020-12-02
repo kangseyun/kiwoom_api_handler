@@ -5,7 +5,6 @@ import os
 import time
 import signal
 
-import pandas as pd
 from PyQt5.QAxContainer import QAxWidget
 from PyQt5.QtCore import QEventLoop, QTimer
 
@@ -67,6 +66,7 @@ class Kiwoom(QAxWidget):
         self.OnReceiveTrData.connect(self.eventReceiveTrData)
         self.OnReceiveChejanData.connect(self.eventReceiveChejanData)
         self.OnReceiveMsg.connect(self.eventReceiveMsg)
+        self.OnReceiveConditionVer.connect(self.eventReceiveConditionVer)
 
     @property
     def log_path(self):
@@ -110,6 +110,17 @@ class Kiwoom(QAxWidget):
         except AttributeError:
             pass
 
+    def eventReceiveConditionVer(self, trCode, msg):
+        print("eventReceiveConditionVer", trCode, msg)
+        nameList = self.dynamicCall("GetConditionNameList()")
+        print(nameList.split(";"))
+        # eventReceiveTrData() 에서 루프종료 or timeout
+        # self.orderLoop = QEventLoop()
+        # #QTimer.singleShot(1000, self.orderLoop.exit)  # timout in 1000 ms
+        # self.orderLoop.exec_()
+        
+        return
+
     def eventReceiveMsg(self, scrNo, rqName, trCode, msg):
         """ 수신 메시지 이벤트
         서버로 어떤 요청을 했을 때(로그인, 주문, 조회 등),
@@ -128,7 +139,7 @@ class Kiwoom(QAxWidget):
         """
         if hasattr(self, "orderResponse"):
             self.orderResponse.update({"msg": msg})
-
+        
         self.logger.debug(msg)
 
     def eventReceiveTrData(self, scrNo, rqName, trCode, recordName, inquiry, **kwargs):
@@ -278,6 +289,12 @@ class Kiwoom(QAxWidget):
         accounts = self.getLoginInfo("ACCNO").rstrip(";")
         return accounts.split(";")
 
+    def getConditionLoad(self):
+        """
+        """
+        return self.dynamicCall("GetConditionLoad()")
+
+        
     def getLoginInfo(self, tag):
         """ 사용자의 tag에 해당하는 정보를 반환한다.
         tag에 올 수 있는 값은 아래와 같다.
@@ -857,6 +874,7 @@ class APIDelayCheck:
             self.logger = logger
 
     def checkDelay(self):
+        print("checkDelay")
         """ TR 1초 5회 제한을 피하기 위해, 조회 요청을 지연합니다. """
         time.sleep(0.1)  # 기본적으로 요청 간에는 0.1초 delay
 

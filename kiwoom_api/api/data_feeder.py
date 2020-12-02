@@ -2,8 +2,6 @@ from collections import defaultdict
 from datetime import datetime
 import os
 
-import pandas as pd
-
 from .errors import KiwoomConnectError, ParameterTypeError, ParameterValueError, KiwoomTrNotSupported
 from .return_codes import TRName
 
