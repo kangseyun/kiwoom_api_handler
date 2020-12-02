@@ -13,6 +13,7 @@ from ._logger import Logger
 from .errors import (KiwoomConnectError, KiwoomProcessingError,
                      ParameterTypeError, ParameterValueError)
 from .return_codes import FidList, ReturnCode, TRKeys
+from telegram_bot.telebot import TeleBot
 
 
 class Kiwoom(QAxWidget):
@@ -53,7 +54,7 @@ class Kiwoom(QAxWidget):
         # logging 클래스
         self.homepath = os.environ.get('userprofile')
         self.logger = Logger(path=self.log_path, name="Kiwoom")
-
+        self.telebot = TeleBot("1478697717:AAEc-YCoIJEM3oRWVZS3P2gqwpcdqv_O3tA")
         # API 요청 제한 관리 Queue (1초 5회, 1시간 1,000회)
         self.requestDelayCheck = APIDelayCheck(logger=self.logger)
         self.orderDelayCheck = APIDelayCheck(logger=self.logger)
@@ -67,6 +68,8 @@ class Kiwoom(QAxWidget):
         self.OnReceiveChejanData.connect(self.eventReceiveChejanData)
         self.OnReceiveMsg.connect(self.eventReceiveMsg)
         self.OnReceiveConditionVer.connect(self.eventReceiveConditionVer)
+        self.OnReceiveTrCondition.connect(self.eventReceiveTrCondition)
+        self.OnReceiveRealCondition.connect(self.eventReceiveRealCondition)
 
     @property
     def log_path(self):
@@ -110,16 +113,44 @@ class Kiwoom(QAxWidget):
         except AttributeError:
             pass
 
-    def eventReceiveConditionVer(self, trCode, msg):
-        print("eventReceiveConditionVer", trCode, msg)
-        nameList = self.dynamicCall("GetConditionNameList()")
-        print(nameList.split(";"))
-        # eventReceiveTrData() 에서 루프종료 or timeout
-        # self.orderLoop = QEventLoop()
-        # #QTimer.singleShot(1000, self.orderLoop.exit)  # timout in 1000 ms
-        # self.orderLoop.exec_()
-        
-        return
+
+    def eventReceiveConditionVer(self, lRet, sMsg):
+        """ 
+         조건 검색 목록 조회 수신 이벤트 
+        """
+        data = self.dynamicCall("GetConditionNameList()")
+        conditions = data.split(";")[:-1]
+        result = []
+
+        for condition in conditions:
+            cond_index, cond_name = condition.split('^')
+            result.append((cond_index, cond_name))
+
+        self.sendCondition(result[1][1], result[1][0], 1)
+        return result
+
+    def eventReceiveTrCondition(self, sScrNo, strCodeList, strConditionName, nIndex, nNext):
+        """ 
+         조건 검색 목록 조회 수신 이벤트 
+        """
+
+        codeList = strCodeList.split(";")
+        result = []
+
+        for i in codeList:
+            codeName = self.dynamicCall("GetMasterCodeName(QString)", i) # 종목 이름
+            lastPrice = self.dynamicCall("GetMasterLastPrice(QString)", i) # 전일가
+            code = {
+                'name': codeName,
+                'lastPrice': lastPrice
+            }
+            
+            result.append(code)
+        self.telebot.send(f'조건 검색 결과: [{strConditionName}] - {result}')
+
+    def eventReceiveRealCondition(self, sCode, sType, strConditionName, strConditionIndex):
+        self.telebot.send(f'실시간 조건 검색 변경 사항: [{strConditionName}] - {sCode} 타임: {sType}')
+
 
     def eventReceiveMsg(self, scrNo, rqName, trCode, msg):
         """ 수신 메시지 이벤트
@@ -289,10 +320,36 @@ class Kiwoom(QAxWidget):
         accounts = self.getLoginInfo("ACCNO").rstrip(";")
         return accounts.split(";")
 
+
     def getConditionLoad(self):
         """
+            조건 검색 가져오기
         """
         return self.dynamicCall("GetConditionLoad()")
+
+    def getConditionNameList(self):
+        """
+            조건 검색 가져오기
+        """
+        return self.dynamicCall("getConditionNameList()")
+
+    def sendCondition(self, conditionName, nIndex, nSearch):
+        """
+        조건 검색 하기
+
+        Parameters
+        ----------
+        conditionName: str 조건식 이름
+        nIndex :int 조건명 인덱스
+        nSearch: int 조회구분, 0:조건검색, 1:실시간 조건검색
+        Returns
+        -----------
+        """
+        data = self.dynamicCall(
+            "SendCondition(QString, QString, int, int)", "0156", conditionName, nIndex, nSearch
+        )
+        self.telebot.send("조검 검색 시작")
+        return data
 
         
     def getLoginInfo(self, tag):
@@ -314,7 +371,7 @@ class Kiwoom(QAxWidget):
 
         if not self.connectState:  # 1: 연결, 0: 미연결
             raise KiwoomConnectError()
-
+        
         tags = ["ACCOUNT_CNT", "ACCNO", "USER_ID", "USER_NAME", "GetServerGubun"]
         if tag not in tags:
             raise ParameterValueError()
@@ -323,6 +380,7 @@ class Kiwoom(QAxWidget):
             info = self.getServerGubun()
         else:
             info = self.dynamicCall('GetLoginInfo("{}")'.format(tag))
+
         return info
 
     def getServerGubun(self):
@@ -415,7 +473,7 @@ class Kiwoom(QAxWidget):
             inquiry,
             scrNo,
         )
-
+        print("returnCode", returnCode)
         if returnCode != 0:  # 0이외엔 실패
             self.logger.error(
                 "{} commRqData {} Request Failed!, CAUSE: {}".format(

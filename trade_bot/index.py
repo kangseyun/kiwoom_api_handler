@@ -4,16 +4,15 @@ import os
 import sys
 import time
 
-
 sys.path.append(r"C:\Users\seyun\Documents\project\kiwoom_api_handler")
 import unittest
 
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QAxContainer import *
-
 from kiwoom_api.api import Kiwoom, DataFeeder
-from pymongo import MongoClient
+
+from telegram_bot.telebot import TeleBot
 
 class MyWindow(QMainWindow):
     def __init__(self):
@@ -24,24 +23,19 @@ class MyWindow(QMainWindow):
         a = Kiwoom.instance()
         dataFeeder = DataFeeder(a)
         a.commConnect()
-        getServerGubun = a.getServerGubun()
-        login_info = a.getLoginInfo("USER_NAME")
-        a.getConditionLoad()    
-        self.my_client = MongoClient("mongodb://localhost:27017/")
-        self.mydb = self.my_client['trade_bot']
-        self.mycol = self.mydb['trade_bot']
-        x = self.mycol.insert_one({"name":"SOMJANG", "address":"Dongjakgu, Seoul"})
-        print(self.my_client.list_database_names())
-
-
+        a.getConditionLoad()
+    
+        # a.sendCondition(condition[0][0], condition[0][1], 0)
+   
 
     def event_connect(self, err_code):
         if err_code == 0:
             self.text_edit.append("로그인 성공")
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
 
+
+    app = QApplication(sys.argv)
     myWindow = MyWindow()
     myWindow.show()
     app.exec_()
